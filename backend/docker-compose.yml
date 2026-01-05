@@ -1,0 +1,30 @@
+# 會議室 AI 系統 - Docker Compose
+version: '3.8'
+
+services:
+  meeting-ai-backend:
+    build: .
+    container_name: meeting-ai-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # 持久化資料庫和會議檔案
+      - ./data:/app/data
+    environment:
+      - DEBUG=false
+      - DATABASE_PATH=/app/data/meetings.db
+      - STORAGE_PATH=/app/data/meetings
+      # 以下變數請在 .env 或直接設定
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-會議室 AI 系統}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+

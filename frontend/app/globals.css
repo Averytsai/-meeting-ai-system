@@ -1,0 +1,250 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 自定義基礎樣式 - 科技深色主題 */
+@layer base {
+  html {
+    font-family: 'Space Grotesk', 'Noto Sans TC', sans-serif;
+  }
+  
+  body {
+    @apply bg-dark text-white antialiased;
+    background: 
+      radial-gradient(ellipse at top, rgba(124, 58, 237, 0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+      #0a0a0f;
+    min-height: 100vh;
+  }
+
+  /* 自定義滾動條 */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 212, 255, 0.3);
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 212, 255, 0.5);
+  }
+}
+
+/* 自定義組件樣式 */
+@layer components {
+  /* 玻璃卡片 */
+  .glass-card {
+    @apply rounded-2xl p-6;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300;
+  }
+
+  .glass-card-hover:hover {
+    border-color: rgba(0, 212, 255, 0.3);
+    box-shadow: 
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 0 20px rgba(0, 212, 255, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  
+  /* 霓虹主按鈕 */
+  .btn-neon {
+    @apply px-8 py-4 font-semibold rounded-2xl
+           transition-all duration-300 ease-out
+           disabled:opacity-50 disabled:cursor-not-allowed;
+    background: linear-gradient(135deg, #00d4ff 0%, #7c3aed 100%);
+    background-size: 200% 200%;
+    color: white;
+    box-shadow: 
+      0 4px 20px rgba(0, 212, 255, 0.3),
+      0 0 40px rgba(0, 212, 255, 0.1);
+  }
+  
+  .btn-neon:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 
+      0 6px 30px rgba(0, 212, 255, 0.5),
+      0 0 60px rgba(0, 212, 255, 0.2);
+    animation: gradient-shift 2s ease infinite;
+  }
+  
+  .btn-neon:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  
+  /* 危險按鈕 (結束會議) - 霓虹粉紅 */
+  .btn-danger-neon {
+    @apply px-8 py-4 font-semibold rounded-2xl
+           transition-all duration-300 ease-out;
+    background: linear-gradient(135deg, #ff3366 0%, #ff6b6b 100%);
+    color: white;
+    box-shadow: 0 4px 20px rgba(255, 51, 102, 0.3);
+    animation: neon-pulse 2s ease-in-out infinite;
+  }
+  
+  .btn-danger-neon:hover {
+    transform: scale(1.05);
+    box-shadow: 
+      0 6px 30px rgba(255, 51, 102, 0.5),
+      0 0 60px rgba(255, 51, 102, 0.2);
+  }
+  
+  .btn-danger-neon:active {
+    transform: scale(0.98);
+  }
+  
+  /* 輸入框 - 科技風格 */
+  .input-neon {
+    @apply w-full px-4 py-3 rounded-xl
+           text-white placeholder:text-zinc-500
+           transition-all duration-300;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .input-neon:focus {
+    outline: none;
+    border-color: rgba(0, 212, 255, 0.5);
+    box-shadow: 
+      0 0 20px rgba(0, 212, 255, 0.2),
+      inset 0 0 20px rgba(0, 212, 255, 0.05);
+  }
+  
+  /* 標籤 - 霓虹風格 */
+  .tag-neon {
+    @apply inline-flex items-center gap-2 px-4 py-2 
+           rounded-xl text-sm font-medium transition-all duration-200;
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    color: #00d4ff;
+  }
+  
+  .tag-neon:hover {
+    background: rgba(0, 212, 255, 0.15);
+    border-color: rgba(0, 212, 255, 0.4);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+  }
+
+  /* 小按鈕 */
+  .btn-icon {
+    @apply p-2 rounded-lg transition-all duration-200;
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    color: #00d4ff;
+  }
+
+  .btn-icon:hover {
+    background: rgba(0, 212, 255, 0.2);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+  }
+}
+
+/* 錄音指示器 - 霓虹脈衝 */
+.recording-dot {
+  @apply w-3 h-3 rounded-full;
+  background: #ff3366;
+  box-shadow: 0 0 10px #ff3366, 0 0 20px rgba(255, 51, 102, 0.5);
+  animation: neon-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes neon-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 10px #ff3366, 0 0 20px rgba(255, 51, 102, 0.5);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 20px #ff3366, 0 0 40px rgba(255, 51, 102, 0.8);
+  }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* 音波動畫 */
+.soundwave-bar {
+  @apply w-1 bg-neon-cyan rounded-full;
+  animation: soundwave 0.5s ease-in-out infinite;
+}
+
+.soundwave-bar:nth-child(1) { animation-delay: 0s; height: 20px; }
+.soundwave-bar:nth-child(2) { animation-delay: 0.1s; height: 30px; }
+.soundwave-bar:nth-child(3) { animation-delay: 0.2s; height: 25px; }
+.soundwave-bar:nth-child(4) { animation-delay: 0.3s; height: 35px; }
+.soundwave-bar:nth-child(5) { animation-delay: 0.4s; height: 20px; }
+
+@keyframes soundwave {
+  0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+/* Modal 背景 */
+.modal-backdrop {
+  @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  animation: fade-in 0.2s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 進度條 - 霓虹風格 */
+.progress-bar-neon {
+  @apply h-2 rounded-full overflow-hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.progress-bar-fill-neon {
+  @apply h-full rounded-full transition-all duration-500 ease-out;
+  background: linear-gradient(90deg, #00d4ff 0%, #7c3aed 100%);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+}
+
+/* 霓虹文字發光 */
+.text-glow {
+  text-shadow: 0 0 10px rgba(0, 212, 255, 0.8), 0 0 20px rgba(0, 212, 255, 0.4);
+}
+
+.text-glow-pink {
+  text-shadow: 0 0 10px rgba(255, 51, 102, 0.8), 0 0 20px rgba(255, 51, 102, 0.4);
+}
+
+/* 狀態指示器光暈 */
+.status-glow-cyan {
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+}
+
+.status-glow-green {
+  box-shadow: 0 0 15px rgba(0, 255, 136, 0.4);
+}
+
+.status-glow-pink {
+  box-shadow: 0 0 15px rgba(255, 51, 102, 0.4);
+}
