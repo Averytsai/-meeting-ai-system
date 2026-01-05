@@ -4,10 +4,13 @@ const BACKEND_URL = 'http://tw-07.access.glows.ai:23435';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/meetings/${params.id}/status`);
+    const { id } = await params;
+    const response = await fetch(`${BACKEND_URL}/api/meetings/${id}/status`, {
+      cache: 'no-store',
+    });
     
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });

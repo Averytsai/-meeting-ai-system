@@ -4,12 +4,13 @@ const BACKEND_URL = 'http://tw-07.access.glows.ai:23435';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const formData = await request.formData();
     
-    const response = await fetch(`${BACKEND_URL}/api/meetings/${params.id}/end`, {
+    const response = await fetch(`${BACKEND_URL}/api/meetings/${id}/end`, {
       method: 'POST',
       body: formData,
     });

@@ -134,18 +134,17 @@ export default function HomePage() {
     const poll = async () => {
       try {
         const response = await getMeetingStatus(id);
+        console.log('Poll response:', response);
         
         setProcessingSteps(response.steps);
         setStatus(response.status);
         
         // 如果還在處理中，繼續輪詢
-        if (response.status === 'processing') {
+        if (response.status === 'processing' || response.status === 'uploading') {
           setTimeout(poll, 2000);
         } else if (response.status === 'completed') {
-          // 處理完成，5 秒後重置
-          setTimeout(() => {
-            resetMeeting();
-          }, 5000);
+          // 處理完成，不自動重置，讓用戶看到結果
+          console.log('✅ 處理完成！');
         } else if (response.status === 'failed') {
           setError(response.error || '處理失敗');
         }
