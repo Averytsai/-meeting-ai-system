@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "會議室 AI",
+    "slug": "meeting-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0f"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.meetingai.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "需要麥克風權限以錄製會議內容",
+        "UIBackgroundModes": ["audio"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0f"
+      },
+      "package": "com.meetingai.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "需要麥克風權限以錄製會議內容"
+        }
+      ]
+    ]
+  }
+}

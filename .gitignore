@@ -35,3 +35,9 @@ npm-debug.log*
 coverage/
 .pytest_cache/
 
+
+# Mobile
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/*.log
