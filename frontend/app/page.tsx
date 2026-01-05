@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { Calendar, Cpu } from 'lucide-react';
-import { MeetingPanel, AttendeeList, ProcessingModal } from '@/components';
+import { MeetingPanel, AttendeeList, ProcessingModal, SummaryModal } from '@/components';
 import { useAudioRecorder } from '@/lib/useAudioRecorder';
-import { startMeeting, endMeeting, getMeetingStatus } from '@/lib/api';
+import { startMeeting, endMeeting, getMeetingStatus, getMeetingSummary } from '@/lib/api';
 import type { Attendee, MeetingStatus, ProcessingStep } from '@/lib/types';
 
 // 會議室名稱（可從環境變數或設定檔讀取）
@@ -16,7 +16,10 @@ export default function HomePage() {
   const [meetingId, setMeetingId] = useState<string | null>(null);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [showProcessingModal, setShowProcessingModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [summaryContent, setSummaryContent] = useState('');
+  const [transcriptContent, setTranscriptContent] = useState('');
   const [processingSteps, setProcessingSteps] = useState<{
     upload: ProcessingStep;
     transcription: ProcessingStep;
@@ -102,7 +105,7 @@ export default function HomePage() {
     try {
       setError(null);
       setStatus('uploading');
-      setShowModal(true);
+      setShowProcessingModal(true);
       setProcessingSteps({
         upload: 'in_progress',
         transcription: 'pending',
@@ -143,8 +146,21 @@ export default function HomePage() {
         if (response.status === 'processing' || response.status === 'uploading') {
           setTimeout(poll, 2000);
         } else if (response.status === 'completed') {
-          // 處理完成，不自動重置，讓用戶看到結果
-          console.log('✅ 處理完成！');
+          // 處理完成，獲取摘要並顯示摘要頁面
+          console.log('✅ 處理完成！獲取摘要...');
+          try {
+            const summaryData = await getMeetingSummary(id);
+            setSummaryContent(summaryData.summary);
+            setTranscriptContent(summaryData.transcript);
+            // 關閉處理中 Modal，顯示摘要 Modal
+            setShowProcessingModal(false);
+            setShowSummaryModal(true);
+          } catch (summaryErr) {
+            console.error('獲取摘要失敗:', summaryErr);
+            // 即使獲取摘要失敗，也顯示摘要頁面
+            setShowProcessingModal(false);
+            setShowSummaryModal(true);
+          }
         } else if (response.status === 'failed') {
           setError(response.error || '處理失敗');
         }
@@ -164,21 +180,30 @@ export default function HomePage() {
     setStatus('idle');
     setMeetingId(null);
     setAttendees([]);
-    setShowModal(false);
+    setShowProcessingModal(false);
+    setShowSummaryModal(false);
+    setSummaryContent('');
+    setTranscriptContent('');
     setProcessingSteps({
       upload: 'pending',
       transcription: 'pending',
       summary: 'pending',
       email: 'pending',
     });
+    setError(null);
   }, []);
 
-  // 關閉 Modal
-  const handleCloseModal = useCallback(() => {
-    if (status === 'completed' || status === 'failed') {
+  // 關閉處理中 Modal
+  const handleCloseProcessingModal = useCallback(() => {
+    if (status === 'failed') {
       resetMeeting();
     }
   }, [status, resetMeeting]);
+
+  // 關閉摘要 Modal 並返回首頁
+  const handleCloseSummaryModal = useCallback(() => {
+    resetMeeting();
+  }, [resetMeeting]);
 
   // 顯示錄音錯誤
   useEffect(() => {
@@ -245,10 +270,20 @@ export default function HomePage() {
 
       {/* 處理中 Modal */}
       <ProcessingModal
-        isOpen={showModal}
+        isOpen={showProcessingModal}
         steps={processingSteps}
         error={error || undefined}
-        onClose={handleCloseModal}
+        onClose={handleCloseProcessingModal}
+      />
+
+      {/* 摘要顯示 Modal */}
+      <SummaryModal
+        isOpen={showSummaryModal}
+        summary={summaryContent}
+        transcript={transcriptContent}
+        room={ROOM_NAME}
+        attendeeCount={attendees.length}
+        onClose={handleCloseSummaryModal}
       />
     </div>
   );

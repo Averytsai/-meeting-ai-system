@@ -65,3 +65,20 @@ export async function getMeetingStatus(meetingId: string): Promise<ProcessingSta
   return response.json();
 }
 
+/**
+ * 獲取會議摘要
+ */
+export async function getMeetingSummary(meetingId: string): Promise<{
+  meeting_id: string;
+  summary: string;
+  transcript: string;
+}> {
+  const response = await fetch(`${API_BASE}/meetings/${meetingId}/summary`);
+  
+  if (!response.ok) {
+    throw new Error('無法取得會議摘要');
+  }
+  
+  return response.json();
+}
+

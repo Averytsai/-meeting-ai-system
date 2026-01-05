@@ -5,4 +5,5 @@ export { StatusDisplay } from './StatusDisplay';
 export { AttendeeList } from './AttendeeList';
 export { AttendeeInput } from './AttendeeInput';
 export { ProcessingModal } from './ProcessingModal';
+export { SummaryModal } from './SummaryModal';
 

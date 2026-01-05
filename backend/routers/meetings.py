@@ -227,6 +227,44 @@ async def get_meeting_status(meeting_id: str):
     )
 
 
+@router.get("/{meeting_id}/summary")
+async def get_meeting_summary(meeting_id: str):
+    """
+    獲取會議摘要內容
+    """
+    db = await get_db()
+    
+    # 檢查會議是否存在
+    cursor = await db.execute(
+        "SELECT * FROM meetings WHERE id = ?",
+        (meeting_id,)
+    )
+    meeting = await cursor.fetchone()
+    
+    if not meeting:
+        raise HTTPException(status_code=404, detail="會議不存在")
+    
+    # 讀取摘要檔案
+    summary_content = ""
+    transcript_content = ""
+    
+    meeting_dir = Path(settings.storage_path) / meeting_id
+    
+    summary_path = meeting_dir / "summary.md"
+    if summary_path.exists():
+        summary_content = summary_path.read_text(encoding="utf-8")
+    
+    transcript_path = meeting_dir / "transcript.txt"
+    if transcript_path.exists():
+        transcript_content = transcript_path.read_text(encoding="utf-8")
+    
+    return {
+        "meeting_id": meeting_id,
+        "summary": summary_content,
+        "transcript": transcript_content,
+    }
+
+
 def _calculate_processing_steps(status: MeetingStatus, meeting) -> ProcessingSteps:
     """根據會議狀態計算處理步驟"""
     
