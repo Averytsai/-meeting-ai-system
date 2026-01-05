@@ -6,10 +6,8 @@ import type {
   Attendee 
 } from './types';
 
-// 生產環境使用外部 API，本地開發使用 /api
-const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-  ? 'http://tw-07.access.glows.ai:23435/api'
-  : (process.env.NEXT_PUBLIC_API_URL || '/api');
+// 使用 Next.js API Routes 作為代理，避免 HTTPS→HTTP 混合內容問題
+const API_BASE = '/api';
 
 /**
  * 開始新會議
