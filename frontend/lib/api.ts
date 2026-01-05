@@ -6,7 +6,10 @@ import type {
   Attendee 
 } from './types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
+// 生產環境使用外部 API，本地開發使用 /api
+const API_BASE = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  ? 'http://tw-07.access.glows.ai:23435/api'
+  : (process.env.NEXT_PUBLIC_API_URL || '/api');
 
 /**
  * 開始新會議
