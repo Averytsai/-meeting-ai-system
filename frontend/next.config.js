@@ -1,8 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // 允許跨域請求到後端 API
+  // 只在本地開發時使用 rewrites
   async rewrites() {
+    // 生產環境不使用 rewrites，直接呼叫外部 API
+    if (process.env.NODE_ENV === 'production') {
+      return [];
+    }
     return [
       {
         source: '/api/:path*',
