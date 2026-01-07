@@ -4,7 +4,6 @@
  */
 
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
 
 let recording: Audio.Recording | null = null;
 
@@ -17,10 +16,33 @@ export async function requestPermissions(): Promise<boolean> {
 }
 
 /**
+ * 清理現有的錄音實例
+ */
+async function cleanupRecording(): Promise<void> {
+  if (recording) {
+    try {
+      const status = await recording.getStatusAsync();
+      if (status.isRecording) {
+        await recording.stopAndUnloadAsync();
+      } else if (status.canRecord) {
+        await recording._cleanupForUnloadedRecorder();
+      }
+    } catch (e) {
+      // 忽略清理錯誤
+      console.log('清理舊錄音:', e);
+    }
+    recording = null;
+  }
+}
+
+/**
  * 開始錄音
  */
 export async function startRecording(): Promise<void> {
   try {
+    // 先清理任何現有的錄音
+    await cleanupRecording();
+    
     // 請求權限
     const hasPermission = await requestPermissions();
     if (!hasPermission) {
@@ -31,7 +53,7 @@ export async function startRecording(): Promise<void> {
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
-      staysActiveInBackground: true, // 背景錄音關鍵設定
+      staysActiveInBackground: true,
     });
 
     // 建立錄音實例
@@ -43,6 +65,8 @@ export async function startRecording(): Promise<void> {
     console.log('✅ 錄音開始');
   } catch (error) {
     console.error('❌ 錄音啟動失敗:', error);
+    // 確保清理
+    recording = null;
     throw error;
   }
 }
@@ -74,6 +98,7 @@ export async function stopRecording(): Promise<string> {
     return uri;
   } catch (error) {
     console.error('❌ 停止錄音失敗:', error);
+    recording = null;
     throw error;
   }
 }
@@ -82,22 +107,8 @@ export async function stopRecording(): Promise<string> {
  * 取消錄音
  */
 export async function cancelRecording(): Promise<void> {
-  if (recording) {
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      recording = null;
-      
-      // 刪除錄音檔
-      if (uri) {
-        await FileSystem.deleteAsync(uri, { idempotent: true });
-      }
-      
-      console.log('🗑️ 錄音已取消');
-    } catch (error) {
-      console.error('取消錄音失敗:', error);
-    }
-  }
+  await cleanupRecording();
+  console.log('🗑️ 錄音已取消');
 }
 
 /**
@@ -112,6 +123,9 @@ export function isRecording(): boolean {
  */
 export async function getRecordingStatus(): Promise<Audio.RecordingStatus | null> {
   if (!recording) return null;
-  return await recording.getStatusAsync();
+  try {
+    return await recording.getStatusAsync();
+  } catch {
+    return null;
+  }
 }
-

@@ -14,6 +14,9 @@ import {
 } from 'react-native';
 import * as recorder from './src/services/recorder';
 import * as api from './src/services/api';
+import * as storage from './src/services/storage';
+import { initNetworkListener, checkNetworkStatus, getNetworkStatus } from './src/services/network';
+import { syncPendingMeetings, initAutoSync } from './src/services/sync';
 
 type MeetingStatus = 'idle' | 'recording' | 'uploading' | 'processing' | 'completed' | 'failed';
 
@@ -29,6 +32,46 @@ export default function App() {
   const [showSummary, setShowSummary] = useState(false);
   const [summary, setSummary] = useState('');
   const [transcript, setTranscript] = useState('');
+  const [isOnline, setIsOnline] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [showHistory, setShowHistory] = useState(false);
+  const [localMeetings, setLocalMeetings] = useState<storage.LocalMeeting[]>([]);
+
+  // 初始化網路監聽和自動同步
+  useEffect(() => {
+    const unsubNetwork = initNetworkListener();
+    const unsubSync = initAutoSync();
+    
+    // 檢查初始網路狀態
+    checkNetworkStatus().then(setIsOnline);
+    
+    // 載入本地會議
+    loadLocalMeetings();
+    
+    // 定期檢查網路狀態
+    const interval = setInterval(async () => {
+      const online = await checkNetworkStatus();
+      setIsOnline(online);
+      
+      // 更新待上傳數量
+      const pending = await storage.getPendingMeetings();
+      setPendingCount(pending.length);
+    }, 5000);
+    
+    return () => {
+      unsubNetwork();
+      unsubSync();
+      clearInterval(interval);
+    };
+  }, []);
+
+  // 載入本地會議
+  const loadLocalMeetings = async () => {
+    const meetings = await storage.getLocalMeetings();
+    setLocalMeetings(meetings);
+    const pending = await storage.getPendingMeetings();
+    setPendingCount(pending.length);
+  };
 
   // 錄音計時器
   useEffect(() => {
@@ -69,7 +112,7 @@ export default function App() {
     setAttendees(attendees.filter((a) => a.email !== email));
   };
 
-  // 開始會議
+  // 開始會議（支持離線）
   const handleStartMeeting = async () => {
     if (attendees.length === 0) {
       Alert.alert('錯誤', '請至少新增一位與會者');
@@ -79,22 +122,36 @@ export default function App() {
     try {
       setError(null);
       
-      // 呼叫 API 開始會議
-      const response = await api.startMeeting('會議室 A', attendees);
-      setMeetingId(response.meeting_id);
+      // 生成本地會議 ID
+      const localId = storage.generateLocalMeetingId();
+      setMeetingId(localId);
       
       // 開始錄音
       await recorder.startRecording();
       
+      // 創建本地會議記錄
+      const meeting: storage.LocalMeeting = {
+        id: localId,
+        room: '會議室 A',
+        attendees: [...attendees],
+        audioUri: '',
+        startTime: new Date().toISOString(),
+        status: 'recording',
+        uploadAttempts: 0,
+      };
+      await storage.saveLocalMeeting(meeting);
+      
       setStatus('recording');
       setRecordingTime(0);
+      
+      console.log('✅ 會議開始（本地模式）:', localId);
     } catch (err) {
       setError(err instanceof Error ? err.message : '開始會議失敗');
       Alert.alert('錯誤', err instanceof Error ? err.message : '開始會議失敗');
     }
   };
 
-  // 結束會議
+  // 結束會議（支持離線）
   const handleEndMeeting = async () => {
     if (!meetingId) return;
 
@@ -103,15 +160,35 @@ export default function App() {
       setStatus('uploading');
 
       // 停止錄音
-      const audioUri = await recorder.stopRecording();
-
-      // 上傳錄音
-      await api.endMeeting(meetingId, audioUri, attendees);
+      const tempUri = await recorder.stopRecording();
       
-      setStatus('processing');
-
-      // 開始輪詢狀態
-      pollStatus(meetingId);
+      // 持久化音檔
+      const audioUri = await storage.persistAudioFile(tempUri, meetingId);
+      
+      // 更新本地會議記錄
+      await storage.updateMeetingStatus(meetingId, {
+        audioUri,
+        endTime: new Date().toISOString(),
+        status: 'pending_upload',
+      });
+      
+      // 檢查網路狀態
+      const online = await checkNetworkStatus();
+      
+      if (online) {
+        // 有網路，直接上傳
+        setStatus('processing');
+        await uploadAndProcess(meetingId, audioUri);
+      } else {
+        // 無網路，提示用戶
+        Alert.alert(
+          '已保存到本地',
+          '錄音已保存！網路恢復後會自動上傳處理。',
+          [{ text: '確定', onPress: handleReset }]
+        );
+        await loadLocalMeetings();
+      }
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : '結束會議失敗');
       setStatus('failed');
@@ -119,20 +196,61 @@ export default function App() {
     }
   };
 
-  // 輪詢狀態
-  const pollStatus = useCallback(async (id: string) => {
+  // 上傳並處理
+  const uploadAndProcess = async (localId: string, audioUri: string) => {
     try {
-      const response = await api.getMeetingStatus(id);
+      // 開始服務器會議
+      const startResponse = await api.startMeeting('會議室 A', attendees);
+      const serverId = startResponse.meeting_id;
+      
+      // 上傳錄音
+      await api.endMeeting(serverId, audioUri, attendees);
+      
+      // 更新本地狀態
+      await storage.updateMeetingStatus(localId, { status: 'uploaded' });
+      
+      // 開始輪詢
+      pollStatus(serverId, localId);
+      
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '上傳失敗');
+      setStatus('failed');
+      
+      // 標記為待上傳
+      await storage.updateMeetingStatus(localId, {
+        status: 'pending_upload',
+        lastError: err instanceof Error ? err.message : '上傳失敗',
+      });
+      
+      Alert.alert(
+        '上傳失敗',
+        '錄音已保存到本地，稍後會自動重試上傳。',
+        [{ text: '確定', onPress: handleReset }]
+      );
+    }
+  };
+
+  // 輪詢狀態
+  const pollStatus = useCallback(async (serverId: string, localId: string) => {
+    try {
+      const response = await api.getMeetingStatus(serverId);
 
       if (response.status === 'processing' || response.status === 'uploading') {
-        setTimeout(() => pollStatus(id), 2000);
+        setTimeout(() => pollStatus(serverId, localId), 2000);
       } else if (response.status === 'completed') {
         // 獲取摘要
         try {
-          const summaryData = await api.getMeetingSummary(id);
+          const summaryData = await api.getMeetingSummary(serverId);
           setSummary(summaryData.summary);
           setTranscript(summaryData.transcript);
           setShowSummary(true);
+          
+          // 更新本地記錄
+          await storage.updateMeetingStatus(localId, {
+            status: 'uploaded',
+            summary: summaryData.summary,
+            transcript: summaryData.transcript,
+          });
         } catch (e) {
           console.error('獲取摘要失敗:', e);
         }
@@ -143,7 +261,7 @@ export default function App() {
       }
     } catch (err) {
       console.error('輪詢失敗:', err);
-      setTimeout(() => pollStatus(id), 3000);
+      setTimeout(() => pollStatus(serverId, localId), 3000);
     }
   }, []);
 
@@ -157,6 +275,20 @@ export default function App() {
     setSummary('');
     setTranscript('');
     setError(null);
+    loadLocalMeetings();
+  };
+
+  // 手動同步
+  const handleSync = async () => {
+    if (!isOnline) {
+      Alert.alert('無網路', '請連接網路後再試');
+      return;
+    }
+    
+    Alert.alert('開始同步', '正在上傳待處理的會議...');
+    await syncPendingMeetings();
+    await loadLocalMeetings();
+    Alert.alert('同步完成', `還有 ${pendingCount} 個會議待上傳`);
   };
 
   return (
@@ -166,18 +298,39 @@ export default function App() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>◈ 會議室 AI</Text>
-        {status === 'recording' && (
-          <View style={styles.recordingIndicator}>
-            <View style={styles.recordingDot} />
-            <Text style={styles.recordingText}>REC</Text>
+        <View style={styles.headerRight}>
+          {/* 網路狀態 */}
+          <View style={[styles.networkIndicator, { backgroundColor: isOnline ? '#22c55e' : '#f43f5e' }]}>
+            <Text style={styles.networkText}>{isOnline ? '在線' : '離線'}</Text>
           </View>
-        )}
+          
+          {/* 待上傳數量 */}
+          {pendingCount > 0 && (
+            <TouchableOpacity style={styles.pendingBadge} onPress={handleSync}>
+              <Text style={styles.pendingText}>{pendingCount} 待上傳</Text>
+            </TouchableOpacity>
+          )}
+          
+          {status === 'recording' && (
+            <View style={styles.recordingIndicator}>
+              <View style={styles.recordingDot} />
+              <Text style={styles.recordingText}>REC</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {/* 會議面板 */}
         <View style={styles.panel}>
           <Text style={styles.panelTitle}>◈ 會議室 A ◈</Text>
+          
+          {/* 離線模式提示 */}
+          {!isOnline && status === 'idle' && (
+            <View style={styles.offlineNotice}>
+              <Text style={styles.offlineText}>📵 離線模式：錄音將保存到本地，網路恢復後自動上傳</Text>
+            </View>
+          )}
           
           {/* 狀態 */}
           <View style={styles.statusContainer}>
@@ -264,6 +417,14 @@ export default function App() {
             <Text style={styles.emptyText}>尚未新增與會者</Text>
           )}
         </View>
+
+        {/* 歷史會議按鈕 */}
+        <TouchableOpacity 
+          style={styles.historyButton} 
+          onPress={() => { loadLocalMeetings(); setShowHistory(true); }}
+        >
+          <Text style={styles.historyButtonText}>📋 查看會議記錄 ({localMeetings.length})</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* 摘要 Modal */}
@@ -290,6 +451,58 @@ export default function App() {
           </TouchableOpacity>
         </SafeAreaView>
       </Modal>
+
+      {/* 歷史會議 Modal */}
+      <Modal visible={showHistory} animationType="slide">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>📋 會議記錄</Text>
+            <TouchableOpacity onPress={() => setShowHistory(false)}>
+              <Text style={styles.closeText}>關閉</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            {localMeetings.length === 0 ? (
+              <Text style={styles.emptyText}>尚無會議記錄</Text>
+            ) : (
+              localMeetings.map((meeting) => (
+                <View key={meeting.id} style={styles.historyItem}>
+                  <View style={styles.historyInfo}>
+                    <Text style={styles.historyRoom}>{meeting.room}</Text>
+                    <Text style={styles.historyTime}>
+                      {new Date(meeting.startTime).toLocaleString('zh-TW')}
+                    </Text>
+                    <Text style={styles.historyAttendees}>
+                      {meeting.attendees.map(a => a.email).join(', ')}
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.historyStatus,
+                    { backgroundColor: 
+                      meeting.status === 'uploaded' ? '#22c55e' :
+                      meeting.status === 'pending_upload' ? '#f59e0b' :
+                      meeting.status === 'failed' ? '#f43f5e' : '#6b7280'
+                    }
+                  ]}>
+                    <Text style={styles.historyStatusText}>
+                      {meeting.status === 'uploaded' ? '已上傳' :
+                       meeting.status === 'pending_upload' ? '待上傳' :
+                       meeting.status === 'failed' ? '失敗' : meeting.status}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+
+          {pendingCount > 0 && (
+            <TouchableOpacity style={styles.syncButton} onPress={handleSync}>
+              <Text style={styles.syncButtonText}>🔄 立即同步 ({pendingCount} 個待上傳)</Text>
+            </TouchableOpacity>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -312,6 +525,32 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#00d4ff',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  networkIndicator: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  networkText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  pendingBadge: {
+    backgroundColor: '#f59e0b',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  pendingText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   recordingIndicator: {
     flexDirection: 'row',
@@ -348,6 +587,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     marginBottom: 16,
+  },
+  offlineNotice: {
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  offlineText: {
+    color: '#f59e0b',
+    fontSize: 13,
+    textAlign: 'center',
   },
   statusContainer: {
     flexDirection: 'row',
@@ -446,11 +696,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 20,
   },
+  historyButton: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  historyButtonText: {
+    color: '#a1a1aa',
+    fontSize: 16,
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: '#0a0a0f',
   },
   modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
@@ -459,7 +724,10 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#22c55e',
-    textAlign: 'center',
+  },
+  closeText: {
+    color: '#00d4ff',
+    fontSize: 16,
   },
   modalContent: {
     flex: 1,
@@ -495,7 +763,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   closeButton: {
-    backgroundColor: 'linear-gradient(to right, #00d4ff, #8b5cf6)',
     margin: 16,
     paddingVertical: 16,
     borderRadius: 12,
@@ -503,6 +770,55 @@ const styles = StyleSheet.create({
     backgroundColor: '#00d4ff',
   },
   closeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  historyItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  historyInfo: {
+    flex: 1,
+  },
+  historyRoom: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  historyTime: {
+    color: '#a1a1aa',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  historyAttendees: {
+    color: '#71717a',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  historyStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  historyStatusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  syncButton: {
+    margin: 16,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#f59e0b',
+  },
+  syncButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',

@@ -63,11 +63,17 @@ export async function endMeeting(
 ): Promise<any> {
   const formData = new FormData();
   
+  // iPhone 錄音格式是 M4A（不是 webm）
+  // 從 URI 判斷格式
+  const isM4A = audioUri.includes('.m4a') || audioUri.includes('.caf');
+  const mimeType = isM4A ? 'audio/m4a' : 'audio/webm';
+  const fileName = isM4A ? 'recording.m4a' : 'recording.webm';
+  
   // 添加音檔
   formData.append('audio', {
     uri: audioUri,
-    type: 'audio/m4a',
-    name: 'recording.m4a',
+    type: mimeType,
+    name: fileName,
   } as any);
   
   // 添加與會者
@@ -110,4 +116,3 @@ export async function getMeetingSummary(meetingId: string): Promise<SummaryRespo
 
   return response.json();
 }
-
