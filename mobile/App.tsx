@@ -382,11 +382,19 @@ export default function App() {
 
   // 查看會議詳情
   const handleViewMeetingDetail = async (meeting: storage.LocalMeeting) => {
+    // 先關閉歷史記錄 Modal
+    setShowHistory(false);
+    
+    // 設置選中的會議
     setSelectedMeeting(meeting);
-    setShowMeetingDetail(true);
     setLoadingDetail(true);
     setDetailSummary('');
     setDetailTranscript('');
+    
+    // 延遲打開詳情 Modal，確保歷史 Modal 已關閉
+    setTimeout(() => {
+      setShowMeetingDetail(true);
+    }, 100);
     
     // 如果本地有摘要，直接顯示
     if (meeting.summary) {
