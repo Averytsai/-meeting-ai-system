@@ -52,7 +52,7 @@ async def send_summary_email(
     
     # 建立郵件
     message = MIMEMultipart("alternative")
-    message["Subject"] = f"📋 會議摘要 - {room} ({start_time})"
+    message["Subject"] = f"會議摘要 - {room} ({start_time})"
     message["From"] = f"{settings.smtp_from_name} <{settings.smtp_user}>"
     message["To"] = ", ".join(recipients)
     
@@ -128,16 +128,21 @@ async def send_summary_email(
 
 
 def _markdown_to_html(summary: str, room: str, start_time: str) -> str:
-    """簡單的 Markdown 轉 HTML"""
+    """簡單的 Markdown 轉 HTML（簡潔版）"""
     
     # 基本轉換
     html_body = summary
     
-    # 標題
-    html_body = html_body.replace("# 會議摘要", "<h1>📋 會議摘要</h1>")
-    html_body = html_body.replace("## 📌 會議重點", "<h2>📌 會議重點</h2>")
-    html_body = html_body.replace("## ✅ 決議事項", "<h2>✅ 決議事項</h2>")
-    html_body = html_body.replace("## 📋 待辦事項 (Action Items)", "<h2>📋 待辦事項</h2>")
+    # 標題（不使用表情符號）
+    html_body = html_body.replace("# 會議摘要", "<h1>會議摘要</h1>")
+    html_body = html_body.replace("## 會議重點", "<h2>會議重點</h2>")
+    html_body = html_body.replace("## 決議事項", "<h2>決議事項</h2>")
+    html_body = html_body.replace("## 待辦事項", "<h2>待辦事項</h2>")
+    
+    # 兼容舊格式
+    html_body = html_body.replace("## 📌 會議重點", "<h2>會議重點</h2>")
+    html_body = html_body.replace("## ✅ 決議事項", "<h2>決議事項</h2>")
+    html_body = html_body.replace("## 📋 待辦事項 (Action Items)", "<h2>待辦事項</h2>")
     
     # 換行
     html_body = html_body.replace("\n\n", "</p><p>")
@@ -154,53 +159,78 @@ def _markdown_to_html(summary: str, room: str, start_time: str) -> str:
         <style>
             body {{
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                line-height: 1.6;
-                color: #333;
-                max-width: 800px;
+                line-height: 1.8;
+                color: #2c3e50;
+                max-width: 680px;
                 margin: 0 auto;
-                padding: 20px;
+                padding: 40px 20px;
+                background: #fafafa;
+            }}
+            .container {{
+                background: #fff;
+                padding: 40px;
+                border-radius: 8px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             }}
             h1 {{
                 color: #1a1a2e;
-                border-bottom: 2px solid #00d4ff;
-                padding-bottom: 10px;
+                font-size: 24px;
+                font-weight: 600;
+                margin-bottom: 24px;
+                padding-bottom: 16px;
+                border-bottom: 2px solid #e8e8e8;
             }}
             h2 {{
                 color: #1a1a2e;
-                margin-top: 30px;
+                font-size: 18px;
+                font-weight: 600;
+                margin-top: 32px;
+                margin-bottom: 16px;
+            }}
+            p {{
+                margin: 0 0 16px 0;
             }}
             hr {{
                 border: none;
-                border-top: 1px solid #ddd;
-                margin: 20px 0;
+                border-top: 1px solid #e8e8e8;
+                margin: 24px 0;
             }}
             table {{
                 width: 100%;
                 border-collapse: collapse;
-                margin: 15px 0;
+                margin: 16px 0;
+                font-size: 14px;
             }}
             th, td {{
-                border: 1px solid #ddd;
-                padding: 10px;
+                border: 1px solid #e8e8e8;
+                padding: 12px;
                 text-align: left;
             }}
             th {{
-                background: #f5f5f5;
+                background: #f8f9fa;
+                font-weight: 600;
+            }}
+            .meta {{
+                color: #666;
+                font-size: 14px;
+                margin-bottom: 24px;
             }}
             .footer {{
-                margin-top: 30px;
-                padding-top: 20px;
-                border-top: 1px solid #ddd;
-                color: #666;
+                margin-top: 40px;
+                padding-top: 24px;
+                border-top: 1px solid #e8e8e8;
+                color: #999;
                 font-size: 12px;
+                text-align: center;
             }}
         </style>
     </head>
     <body>
-        <p>{html_body}</p>
+        <div class="container">
+            <p>{html_body}</p>
+        </div>
         <div class="footer">
-            此郵件由會議室 AI 系統自動發送<br>
-            會議室: {room} | 時間: {start_time}
+            會議室 AI 系統 · {room} · {start_time}
         </div>
     </body>
     </html>

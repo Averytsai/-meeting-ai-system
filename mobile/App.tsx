@@ -42,6 +42,11 @@ export default function App() {
   const [pendingCount, setPendingCount] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [localMeetings, setLocalMeetings] = useState<storage.LocalMeeting[]>([]);
+  const [showMeetingDetail, setShowMeetingDetail] = useState(false);
+  const [selectedMeeting, setSelectedMeeting] = useState<storage.LocalMeeting | null>(null);
+  const [detailSummary, setDetailSummary] = useState('');
+  const [detailTranscript, setDetailTranscript] = useState('');
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   // 檢查登入狀態
   useEffect(() => {
@@ -375,6 +380,44 @@ export default function App() {
     Alert.alert('同步完成', `還有 ${pendingCount} 個會議待上傳`);
   };
 
+  // 查看會議詳情
+  const handleViewMeetingDetail = async (meeting: storage.LocalMeeting) => {
+    setSelectedMeeting(meeting);
+    setShowMeetingDetail(true);
+    setLoadingDetail(true);
+    setDetailSummary('');
+    setDetailTranscript('');
+    
+    // 如果本地有摘要，直接顯示
+    if (meeting.summary) {
+      setDetailSummary(meeting.summary);
+      setDetailTranscript(meeting.transcript || '');
+      setLoadingDetail(false);
+      return;
+    }
+    
+    // 如果有伺服器 ID，從伺服器獲取
+    if (meeting.serverId && isOnline) {
+      try {
+        const data = await api.getMeetingSummary(meeting.serverId);
+        setDetailSummary(data.summary || '尚無摘要');
+        setDetailTranscript(data.transcript || '');
+        
+        // 保存到本地
+        await storage.updateMeetingStatus(meeting.id, {
+          summary: data.summary,
+          transcript: data.transcript,
+        });
+      } catch (err) {
+        setDetailSummary('無法獲取摘要');
+      }
+    } else {
+      setDetailSummary('會議尚未處理完成');
+    }
+    
+    setLoadingDetail(false);
+  };
+
   // 載入中
   if (isAuthenticated === null) {
     return (
@@ -577,7 +620,11 @@ export default function App() {
               <Text style={styles.emptyText}>尚無會議記錄</Text>
             ) : (
               localMeetings.map((meeting) => (
-                <View key={meeting.id} style={styles.historyItem}>
+                <TouchableOpacity 
+                  key={meeting.id} 
+                  style={styles.historyItem}
+                  onPress={() => handleViewMeetingDetail(meeting)}
+                >
                   <View style={styles.historyInfo}>
                     <Text style={styles.historyRoom}>{meeting.room}</Text>
                     <Text style={styles.historyTime}>
@@ -587,30 +634,86 @@ export default function App() {
                       {meeting.attendees.map(a => a.email).join(', ')}
                     </Text>
                   </View>
-                  <View style={[
-                    styles.historyStatus,
-                    { backgroundColor: 
-                      meeting.status === 'uploaded' ? '#22c55e' :
-                      meeting.status === 'pending_upload' ? '#f59e0b' :
-                      meeting.status === 'failed' ? '#f43f5e' : '#6b7280'
-                    }
-                  ]}>
-                    <Text style={styles.historyStatusText}>
-                      {meeting.status === 'uploaded' ? '已上傳' :
-                       meeting.status === 'pending_upload' ? '待上傳' :
-                       meeting.status === 'failed' ? '失敗' : meeting.status}
-                    </Text>
-                  </View>
+                  <View style={styles.historyRight}>
+                    <View style={[
+                      styles.historyStatus,
+                      { backgroundColor: 
+                        meeting.status === 'uploaded' ? '#22c55e' :
+                        meeting.status === 'pending_upload' ? '#f59e0b' :
+                        meeting.status === 'failed' ? '#f43f5e' : '#6b7280'
+                      }
+                    ]}>
+                      <Text style={styles.historyStatusText}>
+                        {meeting.status === 'uploaded' ? '已上傳' :
+                         meeting.status === 'pending_upload' ? '待上傳' :
+                         meeting.status === 'failed' ? '失敗' : meeting.status}
+                      </Text>
+                    </View>
+                    <Text style={styles.viewDetailText}>查看 →</Text>
     </View>
+                </TouchableOpacity>
               ))
             )}
           </ScrollView>
 
           {pendingCount > 0 && (
             <TouchableOpacity style={styles.syncButton} onPress={handleSync}>
-              <Text style={styles.syncButtonText}>🔄 立即同步 ({pendingCount} 個待上傳)</Text>
+              <Text style={styles.syncButtonText}>立即同步 ({pendingCount} 個待上傳)</Text>
             </TouchableOpacity>
           )}
+        </SafeAreaView>
+      </Modal>
+
+      {/* 會議詳情 Modal */}
+      <Modal
+        visible={showMeetingDetail}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowMeetingDetail(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowMeetingDetail(false)}>
+              <Text style={styles.modalClose}>← 返回</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>會議詳情</Text>
+            <View style={{ width: 60 }} />
+          </View>
+          
+          <ScrollView style={styles.modalContent}>
+            {selectedMeeting && (
+              <>
+                {/* 會議資訊 */}
+                <View style={styles.detailHeader}>
+                  <Text style={styles.detailRoom}>{selectedMeeting.room}</Text>
+                  <Text style={styles.detailTime}>
+                    {new Date(selectedMeeting.startTime).toLocaleString('zh-TW')}
+                  </Text>
+                  <Text style={styles.detailAttendees}>
+                    與會者：{selectedMeeting.attendees.map(a => a.name || a.email).join(', ')}
+                  </Text>
+                </View>
+                
+                {/* 摘要內容 */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>會議摘要</Text>
+                  {loadingDetail ? (
+                    <ActivityIndicator color="#00d4ff" style={{ marginTop: 20 }} />
+                  ) : (
+                    <Text style={styles.detailContent}>{detailSummary || '尚無摘要'}</Text>
+                  )}
+                </View>
+                
+                {/* 逐字稿 */}
+                {detailTranscript ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>逐字稿</Text>
+                    <Text style={styles.detailTranscript}>{detailTranscript}</Text>
+                  </View>
+                ) : null}
+              </>
+            )}
+          </ScrollView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -944,6 +1047,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  historyRight: {
+    alignItems: 'flex-end',
+  },
+  viewDetailText: {
+    color: '#00d4ff',
+    fontSize: 12,
+    marginTop: 6,
+  },
   syncButton: {
     margin: 16,
     paddingVertical: 16,
@@ -955,5 +1066,54 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // 會議詳情樣式
+  detailHeader: {
+    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.2)',
+  },
+  detailRoom: {
+    color: '#00d4ff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  detailTime: {
+    color: '#a1a1aa',
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  detailAttendees: {
+    color: '#71717a',
+    fontSize: 13,
+  },
+  detailSection: {
+    marginBottom: 24,
+  },
+  detailSectionTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  detailContent: {
+    color: '#d4d4d8',
+    fontSize: 15,
+    lineHeight: 24,
+  },
+  detailTranscript: {
+    color: '#71717a',
+    fontSize: 14,
+    lineHeight: 22,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    padding: 16,
+    borderRadius: 8,
   },
 });
