@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Calendar, Cpu, LogOut } from 'lucide-react';
 import { MeetingPanel, AttendeeList, ProcessingModal, SummaryModal } from '@/components';
 import LoginPage from '@/components/LoginPage';
+import MeetingHistory from '@/components/MeetingHistory';
 import { useAudioRecorder } from '@/lib/useAudioRecorder';
 import { startMeeting, endMeeting, getMeetingStatus, getMeetingSummary } from '@/lib/api';
 import * as auth from '@/lib/auth';
@@ -302,10 +303,10 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6">
-        {/* 桌面/平板：並排佈局 | 手機：堆疊佈局 */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 sm:gap-6 h-full min-h-[calc(100vh-120px)]">
-          {/* 會議控制面板 */}
-          <div className="md:col-span-3 min-h-[400px] md:min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          {/* 左側：會議控制 + 與會者 */}
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+            {/* 會議控制面板 */}
             <MeetingPanel
               room={ROOM_NAME}
               status={status}
@@ -315,16 +316,19 @@ export default function HomePage() {
               disabled={status === 'uploading' || status === 'processing'}
               error={error || undefined}
             />
-          </div>
-          
-          {/* 與會者列表 */}
-          <div className="md:col-span-2 min-h-[300px] md:min-h-0">
+            
+            {/* 與會者列表 */}
             <AttendeeList
               attendees={attendees}
               onAdd={handleAddAttendee}
               onRemove={handleRemoveAttendee}
               disabled={isRecording || status === 'uploading' || status === 'processing'}
             />
+          </div>
+          
+          {/* 右側：會議記錄 */}
+          <div className="lg:col-span-1 min-h-[400px]">
+            <MeetingHistory />
           </div>
         </div>
       </main>
