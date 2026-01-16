@@ -4,9 +4,9 @@
 
 from datetime import datetime
 from pathlib import Path
+from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
-from typing import Optional
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks, Header
 import json
 
 from config import get_settings
@@ -22,9 +22,20 @@ from models.meeting import (
     AttendeeCreate,
 )
 from services.processor import process_meeting
+from routers.auth import get_user_by_token
 
 router = APIRouter()
 settings = get_settings()
+
+
+async def get_current_user_id(authorization: Optional[str] = None) -> Optional[int]:
+    """從 Authorization header 獲取當前用戶 ID"""
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    
+    token = authorization[7:]
+    user = await get_user_by_token(token)
+    return user["id"] if user else None
 
 
 def generate_meeting_id() -> str:
@@ -34,15 +45,22 @@ def generate_meeting_id() -> str:
 
 
 @router.post("/start", response_model=MeetingResponse)
-async def start_meeting(request: MeetingCreate):
+async def start_meeting(
+    request: MeetingCreate,
+    authorization: Optional[str] = Header(None)
+):
     """
     開始新會議
     
     - 建立會議記錄
     - 儲存與會者資訊
+    - 關聯當前登入用戶（如有）
     - 回傳 meeting_id 供前端使用
     """
     db = await get_db()
+    
+    # 獲取當前用戶 ID（可選）
+    user_id = await get_current_user_id(authorization)
     
     # 產生會議 ID
     meeting_id = generate_meeting_id()
@@ -52,13 +70,13 @@ async def start_meeting(request: MeetingCreate):
     meeting_dir = Path(settings.storage_path) / meeting_id
     meeting_dir.mkdir(parents=True, exist_ok=True)
     
-    # 插入會議記錄
+    # 插入會議記錄（包含 user_id）
     await db.execute(
         """
-        INSERT INTO meetings (id, room, start_time, status)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO meetings (id, user_id, room, start_time, status)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (meeting_id, request.room, start_time.isoformat(), MeetingStatus.RECORDING.value)
+        (meeting_id, user_id, request.room, start_time.isoformat(), MeetingStatus.RECORDING.value)
     )
     
     # 插入與會者
@@ -262,6 +280,61 @@ async def get_meeting_summary(meeting_id: str):
         "meeting_id": meeting_id,
         "summary": summary_content,
         "transcript": transcript_content,
+    }
+
+
+@router.get("/my/list")
+async def get_my_meetings(
+    authorization: str = Header(...),
+    limit: int = 50,
+    offset: int = 0
+):
+    """
+    獲取當前用戶的會議列表
+    需要登入
+    """
+    user_id = await get_current_user_id(authorization)
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="請先登入")
+    
+    db = await get_db()
+    
+    # 查詢用戶的會議
+    cursor = await db.execute(
+        """
+        SELECT id, room, start_time, end_time, status, created_at
+        FROM meetings 
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+        """,
+        (user_id, limit, offset)
+    )
+    meetings = await cursor.fetchall()
+    
+    # 獲取總數
+    cursor = await db.execute(
+        "SELECT COUNT(*) as count FROM meetings WHERE user_id = ?",
+        (user_id,)
+    )
+    total = (await cursor.fetchone())["count"]
+    
+    return {
+        "meetings": [
+            {
+                "id": m["id"],
+                "room": m["room"],
+                "start_time": m["start_time"],
+                "end_time": m["end_time"],
+                "status": m["status"],
+                "created_at": m["created_at"]
+            }
+            for m in meetings
+        ],
+        "total": total,
+        "limit": limit,
+        "offset": offset
     }
 
 

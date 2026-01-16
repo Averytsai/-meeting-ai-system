@@ -15,13 +15,19 @@ import {
 import * as recorder from './src/services/recorder';
 import * as api from './src/services/api';
 import * as storage from './src/services/storage';
+import * as auth from './src/services/auth';
 import { initNetworkListener, checkNetworkStatus, getNetworkStatus } from './src/services/network';
 import { syncPendingMeetings, initAutoSync } from './src/services/sync';
+import LoginScreen from './src/components/LoginScreen';
 
 type MeetingStatus = 'idle' | 'recording' | 'uploading' | 'processing' | 'completed' | 'failed';
 
 export default function App() {
-  // 狀態
+  // 認證狀態
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null); // null = 載入中
+  const [currentUser, setCurrentUser] = useState<auth.User | null>(null);
+  
+  // 會議狀態
   const [status, setStatus] = useState<MeetingStatus>('idle');
   const [meetingId, setMeetingId] = useState<string | null>(null);
   const [attendees, setAttendees] = useState<api.Attendee[]>([]);
@@ -37,8 +43,50 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [localMeetings, setLocalMeetings] = useState<storage.LocalMeeting[]>([]);
 
+  // 檢查登入狀態
+  useEffect(() => {
+    const checkAuth = async () => {
+      const user = await auth.getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
+  // 登入成功處理
+  const handleLoginSuccess = (user: auth.User) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+  };
+
+  // 登出處理
+  const handleLogout = async () => {
+    Alert.alert(
+      '確認登出',
+      '確定要登出嗎？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '登出',
+          style: 'destructive',
+          onPress: async () => {
+            await auth.logout();
+            setCurrentUser(null);
+            setIsAuthenticated(false);
+          },
+        },
+      ]
+    );
+  };
+
   // 初始化網路監聽和自動同步
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     const unsubNetwork = initNetworkListener();
     const unsubSync = initAutoSync();
     
@@ -70,7 +118,7 @@ export default function App() {
       unsubSync();
       clearInterval(interval);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   // 載入本地會議
   const loadLocalMeetings = async () => {
@@ -327,14 +375,40 @@ export default function App() {
     Alert.alert('同步完成', `還有 ${pendingCount} 個會議待上傳`);
   };
 
+  // 載入中
+  if (isAuthenticated === null) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00d4ff" />
+          <Text style={styles.loadingText}>載入中...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // 未登入 - 顯示登入頁面
+  if (!isAuthenticated) {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // 已登入 - 顯示主介面
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>◈ 會議室 AI</Text>
+        <TouchableOpacity onPress={handleLogout}>
+          <Text style={styles.headerTitle}>◈ 會議室 AI</Text>
+        </TouchableOpacity>
         <View style={styles.headerRight}>
+          {/* 用戶資訊 */}
+          <TouchableOpacity style={styles.userBadge} onPress={handleLogout}>
+            <Text style={styles.userText}>{currentUser?.email?.split('@')[0] || '用戶'}</Text>
+          </TouchableOpacity>
+          
           {/* 網路狀態 */}
           <View style={[styles.networkIndicator, { backgroundColor: isOnline ? '#22c55e' : '#f43f5e' }]}>
             <Text style={styles.networkText}>{isOnline ? '在線' : '離線'}</Text>
@@ -527,7 +601,7 @@ export default function App() {
                        meeting.status === 'failed' ? '失敗' : meeting.status}
                     </Text>
                   </View>
-                </View>
+    </View>
               ))
             )}
           </ScrollView>
@@ -547,6 +621,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0a0f',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#a1a1aa',
+    marginTop: 16,
+    fontSize: 16,
+  },
+  userBadge: {
+    backgroundColor: 'rgba(0, 212, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.3)',
+  },
+  userText: {
+    color: '#00d4ff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',

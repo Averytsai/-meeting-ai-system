@@ -46,10 +46,24 @@ async def init_db():
     """初始化資料庫表格"""
     db = await get_db()
     
-    # 建立會議主表
+    # 建立用戶表
+    await db.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT,
+            company TEXT,
+            auth_token TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_login_at DATETIME
+        )
+    """)
+    
+    # 建立會議主表（添加 user_id 關聯）
     await db.execute("""
         CREATE TABLE IF NOT EXISTS meetings (
             id TEXT PRIMARY KEY,
+            user_id INTEGER,
             room TEXT NOT NULL,
             start_time DATETIME NOT NULL,
             end_time DATETIME,
@@ -59,7 +73,8 @@ async def init_db():
             summary_path TEXT,
             error_message TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
     
@@ -90,6 +105,23 @@ async def init_db():
     await db.execute("""
         CREATE INDEX IF NOT EXISTS idx_attendees_meeting_id 
         ON attendees(meeting_id)
+    """)
+    
+    # 用戶表索引
+    await db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_users_email 
+        ON users(email)
+    """)
+    
+    await db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_users_auth_token 
+        ON users(auth_token)
+    """)
+    
+    # 會議表 user_id 索引
+    await db.execute("""
+        CREATE INDEX IF NOT EXISTS idx_meetings_user_id 
+        ON meetings(user_id)
     """)
     
     await db.commit()

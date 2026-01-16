@@ -1,17 +1,23 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { Calendar, Cpu } from 'lucide-react';
+import { Calendar, Cpu, LogOut } from 'lucide-react';
 import { MeetingPanel, AttendeeList, ProcessingModal, SummaryModal } from '@/components';
+import LoginPage from '@/components/LoginPage';
 import { useAudioRecorder } from '@/lib/useAudioRecorder';
 import { startMeeting, endMeeting, getMeetingStatus, getMeetingSummary } from '@/lib/api';
+import * as auth from '@/lib/auth';
 import type { Attendee, MeetingStatus, ProcessingStep } from '@/lib/types';
 
 // 會議室名稱（可從環境變數或設定檔讀取）
 const ROOM_NAME = '會議室 A';
 
 export default function HomePage() {
-  // 狀態管理
+  // 認證狀態
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [currentUser, setCurrentUser] = useState<auth.User | null>(null);
+  
+  // 會議狀態管理
   const [status, setStatus] = useState<MeetingStatus>('idle');
   const [meetingId, setMeetingId] = useState<string | null>(null);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
@@ -37,6 +43,32 @@ export default function HomePage() {
 
   // 當前日期時間
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // 檢查登入狀態
+  useEffect(() => {
+    const user = auth.getCurrentUser();
+    if (user) {
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+    } else {
+      setIsAuthenticated(false);
+    }
+  }, []);
+
+  // 登入成功處理
+  const handleLoginSuccess = (user: auth.User) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+  };
+
+  // 登出處理
+  const handleLogout = async () => {
+    if (confirm('確定要登出嗎？')) {
+      await auth.logout();
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+    }
+  };
   
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -212,6 +244,24 @@ export default function HomePage() {
     }
   }, [recordError]);
 
+  // 載入中
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900">
+        <div className="text-center">
+          <div className="animate-spin w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-400">載入中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 未登入 - 顯示登入頁面
+  if (!isAuthenticated) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // 已登入 - 顯示主介面
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
@@ -226,11 +276,22 @@ export default function HomePage() {
             </h1>
           </div>
           
-          <div className="flex items-center gap-2 text-zinc-400 text-sm">
-            <Calendar className="w-4 h-4 text-neon-cyan" />
-            <span className="font-mono">{formatDateTime(currentTime)}</span>
+          <div className="flex items-center gap-3 text-zinc-400 text-sm">
+            {/* 用戶資訊 */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 transition-colors"
+            >
+              <span className="text-cyan-400 text-xs">{currentUser?.email?.split('@')[0]}</span>
+              <LogOut className="w-3.5 h-3.5 text-cyan-400" />
+            </button>
+            
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-neon-cyan" />
+              <span className="font-mono hidden sm:inline">{formatDateTime(currentTime)}</span>
+            </div>
             {isRecording && (
-              <span className="ml-2 flex items-center gap-1 text-neon-pink">
+              <span className="flex items-center gap-1 text-neon-pink">
                 <span className="recording-dot w-2 h-2" />
                 <span className="hidden sm:inline">REC</span>
               </span>
