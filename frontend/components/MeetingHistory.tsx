@@ -32,17 +32,23 @@ export default function MeetingHistory({ onViewMeeting }: MeetingHistoryProps) {
     
     try {
       const headers = getAuthHeaders();
+      console.log('Fetching meetings with headers:', headers);
+      
       const response = await fetch('/api/meetings/list', {
         headers,
       });
       
-      if (!response.ok) {
-        throw new Error('無法獲取會議記錄');
+      const data = await response.json();
+      console.log('Meetings response:', data);
+      
+      if (data.detail && !data.meetings) {
+        // 有錯誤信息
+        throw new Error(data.detail);
       }
       
-      const data = await response.json();
       setMeetings(data.meetings || []);
     } catch (err) {
+      console.error('Fetch meetings error:', err);
       setError(err instanceof Error ? err.message : '獲取失敗');
     } finally {
       setLoading(false);
