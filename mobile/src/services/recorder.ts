@@ -46,8 +46,11 @@ export async function startRecording(): Promise<void> {
     // 請求權限
     const hasPermission = await requestPermissions();
     if (!hasPermission) {
-      throw new Error('需要麥克風權限');
+      throw new Error('需要麥克風權限才能錄音。請在設定中允許麥克風存取。');
     }
+
+    // 權限剛授予時需要短暫延遲（特別是 iPad）
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // 設定音訊模式
     await Audio.setAudioModeAsync({
@@ -55,6 +58,9 @@ export async function startRecording(): Promise<void> {
       playsInSilentModeIOS: true,
       staysActiveInBackground: true,
     });
+
+    // 再次短暫延遲確保音訊模式設定完成
+    await new Promise(resolve => setTimeout(resolve, 200));
 
     // 建立錄音實例
     const { recording: newRecording } = await Audio.Recording.createAsync(
@@ -67,7 +73,10 @@ export async function startRecording(): Promise<void> {
     console.error('❌ 錄音啟動失敗:', error);
     // 確保清理
     recording = null;
-    throw error;
+    
+    // 提供更友好的錯誤訊息
+    const errorMessage = error instanceof Error ? error.message : '錄音啟動失敗';
+    throw new Error(errorMessage);
   }
 }
 

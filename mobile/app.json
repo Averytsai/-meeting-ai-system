@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "會議室 AI",
+    "name": "AI 會議助手",
     "slug": "meeting-ai",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,9 +13,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.meetingai.app",
+      "bundleIdentifier": "com.averytsai.meetingai",
+      "buildNumber": "3",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "需要麥克風權限以錄製會議內容",
+        "NSMicrophoneUsageDescription": "AI 會議助手需要使用麥克風來錄製會議內容，以便進行語音轉文字和生成會議摘要。",
         "UIBackgroundModes": [
           "audio"
         ],
@@ -27,7 +28,9 @@
               "NSIncludesSubdomains": true
             }
           }
-        }
+        },
+        "CFBundleDisplayName": "AI 會議助手",
+        "LSApplicationQueriesSchemes": ["mailto"]
       }
     },
     "android": {
@@ -35,7 +38,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0a0a0f"
       },
-      "package": "com.meetingai.app",
+      "package": "com.averytsai.meetingai",
+      "versionCode": 3,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.FOREGROUND_SERVICE",
@@ -50,7 +54,7 @@
       [
         "expo-av",
         {
-          "microphonePermission": "需要麥克風權限以錄製會議內容"
+          "microphonePermission": "AI 會議助手需要使用麥克風來錄製會議內容"
         }
       ]
     ]

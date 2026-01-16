@@ -48,6 +48,13 @@ export default function App() {
     // 載入本地會議
     loadLocalMeetings();
     
+    // 預先請求麥克風權限（避免首次使用時的延遲問題）
+    recorder.requestPermissions().then((granted) => {
+      if (!granted) {
+        console.log('麥克風權限未授予');
+      }
+    });
+    
     // 定期檢查網路狀態
     const interval = setInterval(async () => {
       const online = await checkNetworkStatus();
@@ -122,12 +129,39 @@ export default function App() {
     try {
       setError(null);
       
+      // 先確認麥克風權限
+      const hasPermission = await recorder.requestPermissions();
+      if (!hasPermission) {
+        Alert.alert(
+          '需要麥克風權限',
+          '請在設定中允許此 App 使用麥克風，才能進行會議錄音。',
+          [{ text: '確定' }]
+        );
+        return;
+      }
+      
       // 生成本地會議 ID
       const localId = storage.generateLocalMeetingId();
       setMeetingId(localId);
       
-      // 開始錄音
-      await recorder.startRecording();
+      // 開始錄音（包含重試邏輯）
+      let retries = 0;
+      const maxRetries = 2;
+      
+      while (retries <= maxRetries) {
+        try {
+          await recorder.startRecording();
+          break; // 成功，跳出循環
+        } catch (recordError) {
+          retries++;
+          if (retries > maxRetries) {
+            throw recordError;
+          }
+          // 等待後重試
+          await new Promise(resolve => setTimeout(resolve, 500));
+          console.log(`錄音啟動重試 ${retries}/${maxRetries}`);
+        }
+      }
       
       // 創建本地會議記錄
       const meeting: storage.LocalMeeting = {
@@ -146,8 +180,10 @@ export default function App() {
       
       console.log('✅ 會議開始（本地模式）:', localId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '開始會議失敗');
-      Alert.alert('錯誤', err instanceof Error ? err.message : '開始會議失敗');
+      const errorMessage = err instanceof Error ? err.message : '開始會議失敗';
+      setError(errorMessage);
+      setMeetingId(null);
+      Alert.alert('無法開始錄音', errorMessage);
     }
   };
 

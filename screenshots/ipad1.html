@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            width: 2048px;
+            height: 2732px;
+            background: linear-gradient(180deg, #0a0a0f 0%, #1a1a2e 50%, #16213e 100%);
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 100px;
+            color: white;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 60px;
+        }
+        .badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 25px 60px;
+            border-radius: 50px;
+            font-size: 42px;
+            font-weight: 600;
+        }
+        .title {
+            font-size: 100px;
+            font-weight: 700;
+            text-align: center;
+            background: linear-gradient(135deg, #fff 0%, #a8edea 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            font-size: 50px;
+            color: #888;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .app-frame {
+            width: 1600px;
+            height: 1800px;
+            background: #1a1a2e;
+            border-radius: 50px;
+            border: 4px solid #333;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 50px 100px rgba(0,0,0,0.5);
+        }
+        .mic-button {
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 220px;
+            box-shadow: 0 30px 80px rgba(102, 126, 234, 0.5);
+            margin-bottom: 60px;
+        }
+        .start-text {
+            font-size: 72px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        .hint-text {
+            font-size: 40px;
+            color: #666;
+            margin-bottom: 60px;
+        }
+        .features {
+            display: flex;
+            gap: 40px;
+            margin-top: 40px;
+        }
+        .feature {
+            background: #252540;
+            padding: 40px 50px;
+            border-radius: 25px;
+            text-align: center;
+            width: 350px;
+        }
+        .feature-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        .feature-text {
+            font-size: 32px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="badge">✨ AI 驅動會議助手</div>
+        <div class="title">AI 會議助手</div>
+        <div class="subtitle">智能錄音 · AI 摘要 · 自動發送</div>
+        
+        <div class="app-frame">
+            <div class="mic-button">🎙️</div>
+            <div class="start-text">開始錄音</div>
+            <div class="hint-text">點擊開始會議錄音</div>
+            
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">🎤</div>
+                    <div class="feature-text">智能錄音</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📝</div>
+                    <div class="feature-text">AI 摘要</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📧</div>
+                    <div class="feature-text">自動發送</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📵</div>
+                    <div class="feature-text">離線支援</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
