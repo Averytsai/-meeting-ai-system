@@ -62,9 +62,36 @@ export async function startRecording(): Promise<void> {
     // 再次短暫延遲確保音訊模式設定完成
     await new Promise(resolve => setTimeout(resolve, 200));
 
-    // 建立錄音實例
+    // 建立錄音實例 - 使用 m4a 格式（OpenAI Whisper 支持）
+    const recordingOptions: Audio.RecordingOptions = {
+      isMeteringEnabled: true,
+      android: {
+        extension: '.m4a',
+        outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+        audioEncoder: Audio.AndroidAudioEncoder.AAC,
+        sampleRate: 44100,
+        numberOfChannels: 1,
+        bitRate: 128000,
+      },
+      ios: {
+        extension: '.m4a',
+        outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+        audioQuality: Audio.IOSAudioQuality.HIGH,
+        sampleRate: 44100,
+        numberOfChannels: 1,
+        bitRate: 128000,
+        linearPCMBitDepth: 16,
+        linearPCMIsBigEndian: false,
+        linearPCMIsFloat: false,
+      },
+      web: {
+        mimeType: 'audio/webm',
+        bitsPerSecond: 128000,
+      },
+    };
+    
     const { recording: newRecording } = await Audio.Recording.createAsync(
-      Audio.RecordingOptionsPresets.HIGH_QUALITY
+      recordingOptions
     );
 
     recording = newRecording;

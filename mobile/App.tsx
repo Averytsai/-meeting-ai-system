@@ -673,11 +673,14 @@ export default function App() {
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowMeetingDetail(false)}>
-              <Text style={styles.modalClose}>← 返回</Text>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => setShowMeetingDetail(false)}
+            >
+              <Text style={styles.backButtonText}>← 返回</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>會議詳情</Text>
-            <View style={{ width: 60 }} />
+            <View style={{ width: 70 }} />
           </View>
           
           <ScrollView style={styles.modalContent}>
@@ -1066,6 +1069,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // 返回按鈕
+  backButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    color: '#00d4ff',
+    fontSize: 16,
+    fontWeight: '500',
   },
   // 會議詳情樣式
   detailHeader: {

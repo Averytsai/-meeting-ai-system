@@ -133,8 +133,31 @@ async def end_meeting(
     meeting_dir = Path(settings.storage_path) / meeting_id
     meeting_dir.mkdir(parents=True, exist_ok=True)
     
-    audio_path = meeting_dir / "audio.webm"
+    # 根據上傳的檔案類型決定副檔名
     content = await audio.read()
+    
+    # 從檔名或 content-type 獲取副檔名
+    original_filename = audio.filename or "audio.m4a"
+    if original_filename.endswith('.m4a'):
+        ext = '.m4a'
+    elif original_filename.endswith('.webm'):
+        ext = '.webm'
+    elif original_filename.endswith('.wav'):
+        ext = '.wav'
+    elif original_filename.endswith('.mp3'):
+        ext = '.mp3'
+    else:
+        # 檢查文件頭來判斷格式
+        if content[:4] == b'ftyp' or content[4:8] == b'ftyp':
+            ext = '.m4a'  # MP4/M4A 格式
+        elif content[:4] == b'RIFF':
+            ext = '.wav'
+        elif content[:3] == b'ID3' or content[:2] == b'\xff\xfb':
+            ext = '.mp3'
+        else:
+            ext = '.m4a'  # 預設使用 m4a
+    
+    audio_path = meeting_dir / f"audio{ext}"
     
     with open(audio_path, "wb") as f:
         f.write(content)
