@@ -584,10 +584,22 @@ export default function App() {
       <Modal visible={showSummary} animationType="slide">
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>✓ 會議處理完成！</Text>
+            <View style={{ width: 70 }} />
+            <Text style={styles.modalTitle}>會議處理完成</Text>
+            <TouchableOpacity 
+              style={styles.headerCloseButton}
+              onPress={handleReset}
+            >
+              <Text style={styles.headerCloseText}>完成</Text>
+            </TouchableOpacity>
           </View>
           
           <ScrollView style={styles.modalContent}>
+            <View style={styles.successBanner}>
+              <Text style={styles.successIcon}>✓</Text>
+              <Text style={styles.successText}>摘要已生成並發送郵件</Text>
+            </View>
+            
             <Text style={styles.sectionTitle}>AI 會議摘要</Text>
             <View style={styles.summaryBox}>
               <Text style={styles.summaryText}>{summary || '無摘要'}</Text>
@@ -599,8 +611,8 @@ export default function App() {
             </View>
           </ScrollView>
 
-          <TouchableOpacity style={styles.closeButton} onPress={handleReset}>
-            <Text style={styles.closeButtonText}>結束會議，返回首頁</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleReset}>
+            <Text style={styles.primaryButtonText}>開始新會議</Text>
           </TouchableOpacity>
         </SafeAreaView>
       </Modal>
@@ -1079,6 +1091,50 @@ const styles = StyleSheet.create({
     color: '#00d4ff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  // Header 關閉按鈕
+  headerCloseButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  headerCloseText: {
+    color: '#00d4ff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // 成功提示
+  successBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+  },
+  successIcon: {
+    fontSize: 24,
+    color: '#22c55e',
+    marginRight: 12,
+  },
+  successText: {
+    color: '#22c55e',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  // 主要按鈕
+  primaryButton: {
+    margin: 16,
+    paddingVertical: 18,
+    borderRadius: 14,
+    alignItems: 'center',
+    backgroundColor: '#00d4ff',
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
   // 會議詳情樣式
   detailHeader: {
