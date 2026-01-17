@@ -65,6 +65,7 @@ async def init_db():
             id TEXT PRIMARY KEY,
             user_id INTEGER,
             room TEXT NOT NULL,
+            topic TEXT,
             start_time DATETIME NOT NULL,
             end_time DATETIME,
             status TEXT DEFAULT 'recording',
@@ -77,6 +78,12 @@ async def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
+    
+    # 嘗試添加 topic 欄位（如果不存在）
+    try:
+        await db.execute("ALTER TABLE meetings ADD COLUMN topic TEXT")
+    except Exception:
+        pass  # 欄位已存在
     
     # 建立與會者表
     await db.execute("""

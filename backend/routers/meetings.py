@@ -70,13 +70,13 @@ async def start_meeting(
     meeting_dir = Path(settings.storage_path) / meeting_id
     meeting_dir.mkdir(parents=True, exist_ok=True)
     
-    # 插入會議記錄（包含 user_id）
+    # 插入會議記錄（包含 user_id 和 topic）
     await db.execute(
         """
-        INSERT INTO meetings (id, user_id, room, start_time, status)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO meetings (id, user_id, room, topic, start_time, status)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (meeting_id, user_id, request.room, start_time.isoformat(), MeetingStatus.RECORDING.value)
+        (meeting_id, user_id, request.room, request.topic, start_time.isoformat(), MeetingStatus.RECORDING.value)
     )
     
     # 插入與會者
@@ -406,4 +406,104 @@ def _calculate_processing_steps(status: MeetingStatus, meeting) -> ProcessingSte
         )
     
     return ProcessingSteps()
+
+
+@router.get("/daily-summary")
+async def get_daily_summary(
+    date: Optional[str] = None,
+    authorization: str = Header(...)
+):
+    """
+    獲取每日會議總結
+    
+    - date: 日期格式 YYYY-MM-DD，預設為今天
+    - 返回該日所有已完成會議的合併摘要
+    """
+    user_id = await get_current_user_id(authorization)
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="請先登入")
+    
+    # 解析日期
+    from datetime import datetime, timedelta
+    if date:
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="日期格式錯誤，請使用 YYYY-MM-DD")
+    else:
+        target_date = datetime.now()
+    
+    # 當天的時間範圍
+    start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + timedelta(days=1)
+    
+    db = await get_db()
+    
+    # 查詢當天已完成的會議
+    cursor = await db.execute(
+        """
+        SELECT id, room, topic, start_time, end_time, summary_path
+        FROM meetings
+        WHERE user_id = ? 
+          AND status = 'completed'
+          AND start_time >= ?
+          AND start_time < ?
+        ORDER BY start_time ASC
+        """,
+        (user_id, start_of_day.isoformat(), end_of_day.isoformat())
+    )
+    meetings = await cursor.fetchall()
+    
+    if not meetings:
+        return {
+            "summary": "今天還沒有已完成的會議記錄。",
+            "date": target_date.strftime("%Y-%m-%d"),
+            "meeting_count": 0
+        }
+    
+    # 獲取用戶名稱
+    cursor = await db.execute("SELECT email, name FROM users WHERE id = ?", (user_id,))
+    user = await cursor.fetchone()
+    user_name = user["name"] if user and user["name"] else user["email"].split("@")[0].split(".")[0].capitalize() if user else "用戶"
+    
+    # 生成每日總結
+    date_str = target_date.strftime("%-m/%-d")
+    summary_lines = [f"📅 {date_str} {user_name} 業務日誌\n"]
+    
+    for idx, meeting in enumerate(meetings, 1):
+        topic = meeting["topic"] or meeting["room"]
+        time_str = datetime.fromisoformat(meeting["start_time"]).strftime("%H:%M")
+        
+        summary_lines.append(f"{idx}. {topic}")
+        
+        # 讀取會議摘要
+        if meeting["summary_path"]:
+            summary_path = Path(settings.storage_path) / meeting["id"] / meeting["summary_path"]
+            if summary_path.exists():
+                try:
+                    with open(summary_path, "r", encoding="utf-8") as f:
+                        meeting_summary = f.read()
+                    # 提取摘要重點（簡化）
+                    lines = meeting_summary.split("\n")
+                    key_points = []
+                    for line in lines:
+                        line = line.strip()
+                        if line.startswith("-") or line.startswith("•"):
+                            key_points.append(line)
+                        if len(key_points) >= 3:
+                            break
+                    if key_points:
+                        for point in key_points:
+                            summary_lines.append(f"   {point}")
+                except Exception:
+                    pass
+        
+        summary_lines.append(f"   ⏰ {time_str}\n")
+    
+    return {
+        "summary": "\n".join(summary_lines),
+        "date": target_date.strftime("%Y-%m-%d"),
+        "meeting_count": len(meetings)
+    }
 

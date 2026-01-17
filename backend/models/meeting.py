@@ -48,6 +48,7 @@ class Attendee(BaseModel):
 class MeetingCreate(BaseModel):
     """開始會議請求"""
     room: str = Field(..., min_length=1, max_length=100, description="會議室名稱")
+    topic: Optional[str] = Field(None, max_length=200, description="會議主題（選填）")
     attendees: List[AttendeeCreate] = Field(
         default_factory=list, 
         description="與會者列表"
