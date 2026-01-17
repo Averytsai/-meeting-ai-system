@@ -85,7 +85,14 @@ export default function MeetingHistory({ onViewMeeting }: MeetingHistoryProps) {
   };
 
   const formatTime = (timeStr: string) => {
-    return new Date(timeStr).toLocaleString('zh-TW', {
+    // 後端存的是 UTC 時間，需要轉換為本地時間
+    // 如果時間字串沒有時區信息，加上 'Z' 表示 UTC
+    const utcTimeStr = timeStr.includes('Z') || timeStr.includes('+') 
+      ? timeStr 
+      : timeStr + 'Z';
+    
+    return new Date(utcTimeStr).toLocaleString('zh-TW', {
+      timeZone: 'Asia/Taipei',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
