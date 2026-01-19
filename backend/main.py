@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings, ensure_directories
 from database import init_db, close_db
-from routers import meetings, auth
+from routers import meetings, auth, admin
 
 
 @asynccontextmanager
@@ -53,6 +53,7 @@ app.add_middleware(
 
 # 註冊路由
 app.include_router(auth.router)  # 認證路由（已包含 /api/auth 前綴）
+app.include_router(admin.router)  # 管理員路由（已包含 /api/admin 前綴）
 
 app.include_router(
     meetings.router, 
